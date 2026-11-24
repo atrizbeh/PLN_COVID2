@@ -1,0 +1,55 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: pln_user
+      POSTGRES_PASSWORD: pln_pass
+      POSTGRES_DB: pln_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "pln_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/pln_db
+      SPRING_DATASOURCE_USERNAME: pln_user
+      SPRING_DATASOURCE_PASSWORD: pln_pass
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:8080
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  nlp-service:
+    build:
+      context: ./nlp-service
+    ports:
+      - "8000:8000"
+    environment:
+      PYTHONUNBUFFERED: 1
+    restart: unless-stopped
+
+volumes:
+  pgdata:
